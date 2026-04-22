@@ -56,21 +56,28 @@ def parse_ingresos(raw: str) -> tuple[dict, dict]:
 def procesar(carpeta: Path, ingresos_raw: str = "") -> Path:
     logger.info("Procesando carpeta: %s", carpeta)
 
+    # Escaneo recursivo: incluye subcarpetas (ej. facturas/2026-03/)
     archivos = sorted(
-        p for p in carpeta.iterdir()
+        p for p in carpeta.rglob("*")
         if p.suffix.lower() in (".pdf", ".xml")
     )
     if not archivos:
         logger.warning("No se encontraron PDF/XML en %s", carpeta)
         sys.exit(0)
 
-    # Evita procesar el XML si ya se procesó como par de un PDF
     processed: set[str] = set()
     filas = []
     for archivo in archivos:
         try:
             row = extract_document(archivo, processed)
             if row:
+                # Incluye subcarpeta en el campo archivo para trazabilidad
+                try:
+                    rel = archivo.relative_to(carpeta)
+                    if len(rel.parts) > 1:
+                        row["archivo"] = str(rel)
+                except ValueError:
+                    pass
                 filas.append(row)
                 logger.info("OK  %s → %s | Total: %s", archivo.name, row["tipo"], row["total"])
         except Exception as e:
@@ -95,12 +102,11 @@ def procesar(carpeta: Path, ingresos_raw: str = "") -> Path:
         df_pror = calcular_prorateo_simple(df)
         logger.warning("Ingresos no proporcionados — prorrateo al 100%")
 
-    # Columnas ordenadas para BASE_DATOS
+    # Columnas ordenadas para BASE_DATOS (sin validacion/observacion — ver hoja VALIDACION)
     cols_base = [
         "archivo", "tipo", "cufe", "folio", "fecha",
         "nit_emisor", "nombre_emisor", "nit_receptor", "nombre_receptor",
         "subtotal", "iva_19", "iva_5", "total", "fuente",
-        "validacion", "observacion",
     ]
     df_base = df[[c for c in cols_base if c in df.columns]]
 

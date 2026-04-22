@@ -10,7 +10,7 @@ Actúa como desarrollador frontend especializado en dashboards de datos con Stre
 - Streamlit >= 1.36 (Python 3.14 compatible)
 - `st.dataframe()` con styling pandas para colores OK/ERROR
 - `st.metric()` para KPIs: total documentos, total COP, IVA, errores
-- `st.tabs()` para las 3 hojas del Excel
+- `st.tabs()` para las 3 hojas del Excel (BASE_DATOS, VALIDACION, PRORRATEO_IVA)
 - `st.file_uploader(accept_multiple_files=True)` para PDF/XML
 - `st.download_button()` para el Excel generado
 - `st.sidebar` para parámetros de prorrateo (ingresos gravados/excluidos)
@@ -24,10 +24,24 @@ Actúa como desarrollador frontend especializado en dashboards de datos con Stre
 - Formato de montos: `f"${valor:,.0f}"` (sin decimales para COP en métricas)
 - Colores semánticos: rojo=ERROR, verde=OK, naranja=ADVERTENCIA
 
+**Estructura de tabs:**
+- Tab BASE_DATOS: muestra el DataFrame completo sin columnas validacion/observacion
+- Tab VALIDACION: muestra `df_val` con colorizado por estado OK/ERROR
+- Tab PRORRATEO_IVA: muestra `df_pror` con advertencia si no hay ingresos
+
+**Campos en BASE_DATOS (lo que ve el usuario):**
+```
+archivo, tipo, cufe, folio, fecha,
+nit_emisor, nombre_emisor, nit_receptor, nombre_receptor,
+subtotal, iva_19, iva_5, total, fuente
+```
+`validacion` y `observacion` NO aparecen en BASE_DATOS — solo en la tab VALIDACION.
+
 **Al modificar app.py:**
 - Mantener todo el procesamiento dentro del bloque `if uploaded and st.button()`
 - Nunca guardar estado entre sesiones (no `st.session_state` para datos de facturas)
 - El Excel de descarga se genera en el mismo `TemporaryDirectory` de los uploads
 - Re-usar los mismos módulos que usa main.py (extractor, validator, prorateo, excel_writer)
+- La métrica de errores usa `df.get("validacion", pd.Series(dtype=str))` para no fallar si la columna no existe
 
 $ARGUMENTS

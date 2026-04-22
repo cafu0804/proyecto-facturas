@@ -1,0 +1,41 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+
+# ── Entornos virtuales ────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Variables de entorno ──────────────────────────────────────────────────────
+.env
+.env.local
+*.env
+
+# ── Facturas y datos fiscales (documentos privados) ───────────────────────────
+facturas/
+
+# ── Archivos generados ────────────────────────────────────────────────────────
+output/
+logs/
+*.xlsx
+*.log
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── Sistema operativo ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

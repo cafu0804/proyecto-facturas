@@ -19,15 +19,38 @@ NS = {
 }
 
 # ── Patrones regex para PDF ─────────────────────────────────────────────────
-_RE_CUFE = re.compile(r"CUFE[:\s]+([a-f0-9]{96})", re.I)
-_RE_CUDE = re.compile(r"CUDE[:\s]+([a-f0-9]{96})", re.I)
-_RE_NIT  = re.compile(r"NIT[:\s#.]*([0-9]{6,12})", re.I)
-_RE_DATE = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}|\d{2}-\d{2}-\d{4})")
+_RE_CUFE  = re.compile(r"CUFE[:\s]+([a-f0-9]{96})", re.I)
+_RE_CUDE  = re.compile(r"CUDE[:\s]+([a-f0-9]{96})", re.I)
+_RE_DATE  = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}|\d{2}-\d{2}-\d{4})")
+_RE_MONEY = re.compile(r"[\$]?\s*([\d.,]+)")
+
+# Folio: prioridad "Número de Factura:" (DIAN estándar), luego genérico
 _RE_FOLIO = re.compile(
-    r"(?:factura|nota\s+cr[eé]dito|n[uú]mero|no\.?|nro\.?)[:\s#]*([A-Z0-9\-]+)",
+    r"n[uú]mero\s+de\s+(?:la\s+)?factura\s*[:\s]+([A-Z0-9][A-Z0-9\-]+)"
+    r"|n[uú]mero\s+factura\s*[:\s]+([A-Z0-9][A-Z0-9\-]+)"
+    r"|(?:no\.?|nro\.?)\s+(?:de\s+)?factura\s*[:\s#]+([A-Z0-9][A-Z0-9\-]+)"
+    r"|factura\s+(?:n[uú]m\.?|n[uú]mero|no\.?|nro\.?)\s*[:\s#]+([A-Z0-9][A-Z0-9\-]+)",
     re.I,
 )
-_RE_MONEY = re.compile(r"[\$]?\s*([\d.,]+)")
+
+# Emisor / Vendedor — etiquetas estándar representación gráfica DIAN
+_RE_EMISOR_NIT    = re.compile(r"nit\s+del\s+emisor\s*[:\s]+([0-9]{6,12})", re.I)
+_RE_EMISOR_NOMBRE = re.compile(r"raz[oó]n\s+social\s*[:\s]+([^\n\r]+)", re.I)
+
+# Receptor / Comprador — etiquetas estándar representación gráfica DIAN
+_RE_RECEPTOR_NIT    = re.compile(
+    r"n[uú]mero\s+(?:de\s+)?documento\s*[:\s]+([0-9]{6,12})"
+    r"|nit\s+(?:del\s+)?(?:adquir|comprador|receptor|cliente)[^\n]{0,30}?([0-9]{6,12})",
+    re.I,
+)
+_RE_RECEPTOR_NOMBRE = re.compile(r"nombre\s+o\s+raz[oó]n\s+social\s*[:\s]+([^\n\r]+)", re.I)
+
+# NIT genérico (fallback)
+_RE_NIT_GENERICO = re.compile(r"NIT[:\s#.]*([0-9]{6,12})", re.I)
+
+# Fecha desde nombre de carpeta: YYYY-MM, YYYY-MM-DD, DD-MM-YYYY, etc.
+_RE_FOLDER_YEAR_MONTH = re.compile(r"(\d{4})[-_\s](\d{1,2})(?:[-_\s](\d{1,2}))?")
+_RE_FOLDER_DMY        = re.compile(r"(\d{1,2})[-_/](\d{1,2})[-_/](\d{4})")
 
 
 def _clean_number(value: str) -> float:
@@ -35,7 +58,6 @@ def _clean_number(value: str) -> float:
     value = value.strip().replace(" ", "")
     if not value:
         return 0.0
-    # Formato colombiano: puntos=miles, coma=decimal
     if "," in value and "." in value:
         if value.rfind(",") > value.rfind("."):
             value = value.replace(".", "").replace(",", ".")
@@ -61,6 +83,21 @@ def _parse_date(raw: str) -> str:
     return raw.strip()
 
 
+def _date_from_folder(path: Path) -> str:
+    """Intenta extraer una fecha del nombre de la carpeta que contiene el archivo."""
+    folder = path.parent.name
+    m = _RE_FOLDER_YEAR_MONTH.search(folder)
+    if m:
+        year, month = m.group(1), m.group(2).zfill(2)
+        day = m.group(3).zfill(2) if m.group(3) else "01"
+        return f"{year}-{month}-{day}"
+    m2 = _RE_FOLDER_DMY.search(folder)
+    if m2:
+        day, month, year = m2.group(1).zfill(2), m2.group(2).zfill(2), m2.group(3)
+        return f"{year}-{month}-{day}"
+    return ""
+
+
 def _detect_doc_type(text: str, filename: str) -> str:
     tl = (text + filename).lower()
     if "nota cr" in tl or "note credit" in tl:
@@ -70,6 +107,16 @@ def _detect_doc_type(text: str, filename: str) -> str:
     if "documento soporte" in tl:
         return "Documento Soporte"
     return "Factura Electrónica"
+
+
+def _clean_name(raw: str) -> str:
+    """Limpia un nombre: recorta en etiquetas adyacentes y limita longitud."""
+    raw = raw.strip()
+    # Corta si aparece un patrón "Algo:" luego de texto
+    m = re.search(r"\s{2,}[A-Za-záéíóúÁÉÍÓÚñÑ ]{3,30}\s*:", raw)
+    if m:
+        raw = raw[:m.start()].strip()
+    return raw[:80]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -104,17 +151,21 @@ def extract_xml(path: Path) -> dict:
 
     # Emisor
     nit_emisor  = _xml_text(root, "cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID")
-    nom_emisor  = _xml_text(root, "cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name")
+    nom_emisor  = (
+        _xml_text(root, "cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName")
+        or _xml_text(root, "cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name")
+    )
     # Receptor
     nit_receptor = _xml_text(root, "cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID")
-    nom_receptor = _xml_text(root, "cac:AccountingCustomerParty/cac:Party/cac:PartyName/cbc:Name")
+    nom_receptor = (
+        _xml_text(root, "cac:AccountingCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName")
+        or _xml_text(root, "cac:AccountingCustomerParty/cac:Party/cac:PartyName/cbc:Name")
+    )
 
     subtotal = 0.0
     iva19 = 0.0
     iva5  = 0.0
-    total = 0.0
 
-    # Líneas de impuesto
     for tax in root.findall(".//cac:TaxTotal", NS):
         amount_el = tax.find("cbc:TaxAmount", NS)
         amount = float(amount_el.text) if amount_el is not None and amount_el.text else 0.0
@@ -125,29 +176,30 @@ def extract_xml(path: Path) -> dict:
         elif abs(pct - 5) < 0.5:
             iva5 += amount
 
-    # Totales
     le = root.find("cac:LegalMonetaryTotal", NS)
     if le is not None:
         subtotal = float((_xml_text(le, "cbc:TaxExclusiveAmount") or "0").replace(",", "."))
         total    = float((_xml_text(le, "cbc:PayableAmount") or "0").replace(",", "."))
+    else:
+        total = 0.0
 
     sign = -1 if doc_type == "Nota Crédito" else 1
 
     return {
-        "archivo":       path.name,
-        "tipo":          doc_type,
-        "cufe":          cufe,
-        "folio":         folio,
-        "fecha":         _parse_date(fecha),
-        "nit_emisor":    nit_emisor,
-        "nombre_emisor": nom_emisor,
-        "nit_receptor":  nit_receptor,
+        "archivo":         path.name,
+        "tipo":            doc_type,
+        "cufe":            cufe,
+        "folio":           folio,
+        "fecha":           _parse_date(fecha),
+        "nit_emisor":      nit_emisor,
+        "nombre_emisor":   nom_emisor,
+        "nit_receptor":    nit_receptor,
         "nombre_receptor": nom_receptor,
-        "subtotal":      round(sign * subtotal, 2),
-        "iva_19":        round(sign * iva19, 2),
-        "iva_5":         round(sign * iva5, 2),
-        "total":         round(sign * total, 2),
-        "fuente":        "XML",
+        "subtotal":        round(sign * subtotal, 2),
+        "iva_19":          round(sign * iva19, 2),
+        "iva_5":           round(sign * iva5, 2),
+        "total":           round(sign * total, 2),
+        "fuente":          "XML",
     }
 
 
@@ -157,22 +209,28 @@ def extract_xml(path: Path) -> dict:
 
 def _search_money_near(text: str, label: str) -> float:
     """Busca el valor monetario más cercano a una etiqueta."""
-    pattern = re.compile(
-        rf"{re.escape(label)}[:\s]*([\d.,]+)", re.I
-    )
+    pattern = re.compile(rf"{re.escape(label)}[:\s]*([\d.,]+)", re.I)
     m = pattern.search(text)
     if m:
         return _clean_number(m.group(1))
     return 0.0
 
 
+def _first_group(*matches) -> str:
+    """Retorna el primer grupo no vacío de una lista de match objects."""
+    for m in matches:
+        if m:
+            groups = [g for g in m.groups() if g]
+            if groups:
+                return groups[0].strip()
+    return ""
+
+
 def extract_pdf(path: Path) -> dict:
     """Extrae campos de un PDF DIAN con pdfplumber."""
     try:
         with pdfplumber.open(path) as pdf:
-            text = "\n".join(
-                page.extract_text() or "" for page in pdf.pages
-            )
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
     except Exception as e:
         logger.error("Error leyendo PDF %s: %s", path.name, e)
         return _empty_row(path.name, str(e))
@@ -188,29 +246,47 @@ def extract_pdf(path: Path) -> dict:
         m2 = _RE_CUDE.search(text)
         cufe = m2.group(1) if m2 else ""
 
-    # Folio
-    folio = ""
-    fm = _RE_FOLIO.search(text)
-    if fm:
-        folio = fm.group(1).strip()
+    # Folio — busca "Número de Factura: FE-001" y similares
+    folio = _first_group(_RE_FOLIO.search(text))
 
-    # Fecha
+    # Fecha de emisión
     fecha = ""
-    for dm in _RE_DATE.finditer(text):
-        fecha = _parse_date(dm.group(1))
-        break
+    # Prefiere "Fecha de Emisión:" o "Fecha Emisión:"
+    m_fecha_label = re.search(r"fecha\s+de\s+emisi[oó]n\s*[:\s]+(\S+)", text, re.I)
+    if m_fecha_label:
+        fecha = _parse_date(m_fecha_label.group(1))
+    else:
+        for dm in _RE_DATE.finditer(text):
+            fecha = _parse_date(dm.group(1))
+            break
 
-    # NITs (primero y segundo encontrado)
-    nits = [m.group(1) for m in _RE_NIT.finditer(text)]
-    nit_emisor    = nits[0] if len(nits) > 0 else ""
-    nit_receptor  = nits[1] if len(nits) > 1 else ""
+    # ── Emisor ─────────────────────────────────────────────────────────────
+    # 1. Etiqueta específica DIAN "Nit del Emisor:"
+    m_en = _RE_EMISOR_NIT.search(text)
+    nit_emisor = m_en.group(1).strip() if m_en else ""
 
-    # Nombres: línea siguiente al NIT
-    lines = text.splitlines()
-    nom_emisor   = _extract_name_near(lines, nit_emisor)
-    nom_receptor = _extract_name_near(lines, nit_receptor)
+    # 2. Razón Social (primera aparición → emisor)
+    m_enombre = _RE_EMISOR_NOMBRE.search(text)
+    nom_emisor = _clean_name(m_enombre.group(1)) if m_enombre else ""
 
-    # Montos
+    # ── Receptor ───────────────────────────────────────────────────────────
+    # 1. "Número Documento:" o variantes con contexto comprador
+    m_rn = _RE_RECEPTOR_NIT.search(text)
+    nit_receptor = _first_group(m_rn) if m_rn else ""
+
+    # 2. "Nombre o Razón Social:"
+    m_rnombre = _RE_RECEPTOR_NOMBRE.search(text)
+    nom_receptor = _clean_name(m_rnombre.group(1)) if m_rnombre else ""
+
+    # Fallback genérico por NIT si alguno quedó vacío
+    if not nit_emisor or not nit_receptor:
+        nits = [m.group(1) for m in _RE_NIT_GENERICO.finditer(text)]
+        if not nit_emisor and nits:
+            nit_emisor = nits[0]
+        if not nit_receptor and len(nits) > 1:
+            nit_receptor = nits[1]
+
+    # ── Montos ─────────────────────────────────────────────────────────────
     subtotal = (
         _search_money_near(text, "subtotal")
         or _search_money_near(text, "base gravable")
@@ -223,7 +299,8 @@ def extract_pdf(path: Path) -> dict:
     )
     iva5  = _search_money_near(text, "IVA 5%") or _search_money_near(text, "impuesto 5")
     total = (
-        _search_money_near(text, "total a pagar")
+        _search_money_near(text, "total factura")
+        or _search_money_near(text, "total a pagar")
         or _search_money_near(text, "valor total")
         or _search_money_near(text, "total")
     )
@@ -248,20 +325,6 @@ def extract_pdf(path: Path) -> dict:
     }
 
 
-def _extract_name_near(lines: list[str], nit: str) -> str:
-    """Retorna la línea anterior o posterior donde aparece el NIT."""
-    if not nit:
-        return ""
-    for i, line in enumerate(lines):
-        if nit in line:
-            # Toma la línea que NO sea solo el NIT
-            for candidate in [lines[i-1] if i > 0 else "", line, lines[i+1] if i < len(lines)-1 else ""]:
-                c = candidate.strip()
-                if c and not re.fullmatch(r"[\d\-\s\.]+", c) and len(c) > 4:
-                    return c[:80]
-    return ""
-
-
 def _empty_row(filename: str, error: str) -> dict:
     return {
         "archivo": filename, "tipo": "ERROR", "cufe": "", "folio": "",
@@ -280,22 +343,33 @@ def extract_document(path: Path, processed: set[str]) -> Optional[dict]:
     """
     Extrae un documento. Prefiere XML si existe el par.
     Retorna None si ya fue procesado.
+    Soporta subcarpetas: usa la ruta completa (sin extensión) como clave
+    para evitar colisiones entre archivos con el mismo nombre en distintas carpetas.
     """
-    name_stem = path.stem.lower()
-    if name_stem in processed:
+    # Clave única por carpeta+nombre para soportar subcarpetas
+    name_key = str(path.with_suffix("")).lower()
+    if name_key in processed:
         logger.info("Omitiendo duplicado: %s", path.name)
         return None
-    processed.add(name_stem)
+    processed.add(name_key)
 
     # Prioridad XML
     xml_sibling = path.with_suffix(".xml")
     if path.suffix.lower() == ".pdf" and xml_sibling.exists():
         logger.info("Usando XML en lugar de PDF: %s", xml_sibling.name)
         row = extract_xml(xml_sibling)
-        row["archivo"] = path.name  # conserva nombre PDF como referencia
-        return row
+        row["archivo"] = path.name
+        processed.add(str(xml_sibling.with_suffix("")).lower())
+    elif path.suffix.lower() == ".xml":
+        row = extract_xml(path)
+    else:
+        row = extract_pdf(path)
 
-    if path.suffix.lower() == ".xml":
-        return extract_xml(path)
+    # Fallback de fecha desde nombre de carpeta (si el archivo está en subcarpeta fechada)
+    if not row.get("fecha"):
+        folder_date = _date_from_folder(path)
+        if folder_date:
+            row["fecha"] = folder_date
+            logger.info("Fecha tomada del nombre de carpeta: %s → %s", path.parent.name, folder_date)
 
-    return extract_pdf(path)
+    return row

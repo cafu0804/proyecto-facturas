@@ -81,7 +81,7 @@ if uploaded and st.button("⚙️ Procesar facturas", type="primary"):
         col1.metric("Documentos",  len(df))
         col2.metric("Total COP",   f"${df['total'].sum():,.0f}")
         col3.metric("IVA 19%",     f"${df['iva_19'].sum():,.0f}")
-        col4.metric("Errores",     int((df["validacion"] == "ERROR").sum()))
+        col4.metric("Errores",     int((df.get("validacion", pd.Series(dtype=str)) == "ERROR").sum()))
 
         tab1, tab2, tab3 = st.tabs(["BASE_DATOS", "VALIDACION", "PRORRATEO_IVA"])
         with tab1:
@@ -104,7 +104,7 @@ if uploaded and st.button("⚙️ Procesar facturas", type="primary"):
         cols_base = [
             "archivo", "tipo", "cufe", "folio", "fecha",
             "nit_emisor", "nombre_emisor", "nit_receptor", "nombre_receptor",
-            "subtotal", "iva_19", "iva_5", "total", "fuente", "validacion", "observacion",
+            "subtotal", "iva_19", "iva_5", "total", "fuente",
         ]
         df_base = df[[c for c in cols_base if c in df.columns]]
 
