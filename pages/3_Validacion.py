@@ -31,8 +31,8 @@ elif filtro == "Solo OK":
 
 styled = df_show.style.apply(
     lambda col: [
-        "background-color:#ffcdd2;color:#b71c1c" if v == "ERROR"
-        else "background-color:#c8e6c9;color:#1b5e20" if v == "OK"
+        "background-color:#E8D4D0;color:#8A6A6A" if v == "ERROR"
+        else "background-color:#D8E4D8;color:#5A7A6A" if v == "OK"
         else ""
         for v in col
     ],

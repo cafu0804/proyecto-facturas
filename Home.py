@@ -17,15 +17,15 @@ st.markdown("""
 
   /* Hero */
   .hero {
-    background: linear-gradient(135deg, #fdf0e8 0%, #f5f0eb 50%, #e8eef6 100%);
+    background: linear-gradient(135deg, #F5F3F0 0%, #F0EDED 50%, #ECECF5 100%);
     border-radius: 16px;
     padding: 2.5rem 2.5rem 2rem;
     text-align: center;
     margin-bottom: 2rem;
-    border-top: 5px solid #E05519;
+    border-top: 5px solid #B3A9D4;
   }
-  .hero h1 { font-size: 2.4rem; color: #2B4A7A; margin-bottom: 0.4rem; font-weight: 700; }
-  .hero p  { font-size: 1.1rem; color: #4a4a5a; max-width: 620px; margin: 0 auto 1.5rem; }
+  .hero h1 { font-size: 2.4rem; color: #5A6A7E; margin-bottom: 0.4rem; font-weight: 700; }
+  .hero p  { font-size: 1.1rem; color: #6C7C8C; max-width: 620px; margin: 0 auto 1.5rem; }
 
   /* Logo wrapper */
   .logo-link { display: block; margin-bottom: 1rem; }
@@ -34,14 +34,14 @@ st.markdown("""
   /* Badge de estado */
   .badge {
     display: inline-block;
-    background: #fde8d8;
-    color: #c0400a;
+    background: #E8DFE8;
+    color: #7A7A8A;
     border-radius: 20px;
     padding: 4px 16px;
     font-size: 0.82rem;
     font-weight: 600;
     margin-bottom: 0.8rem;
-    border: 1px solid #f0b890;
+    border: 1px solid #D4C4D8;
   }
 
   /* Cards de features */
@@ -49,21 +49,21 @@ st.markdown("""
     background: #ffffff;
     border-radius: 14px;
     padding: 1.6rem 1.4rem;
-    box-shadow: 0 2px 12px rgba(43,74,122,0.09);
+    box-shadow: 0 2px 12px rgba(90,106,126,0.08);
     border-top: 4px solid;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     height: 100%;
   }
-  .card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(43,74,122,0.15); }
-  .card h3 { font-size: 1.05rem; margin: 0.6rem 0 0.4rem; color: #2B4A7A; font-weight: 700; }
-  .card p  { font-size: 0.9rem; color: #5a6475; margin: 0; line-height: 1.5; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(90,106,126,0.12); }
+  .card h3 { font-size: 1.05rem; margin: 0.6rem 0 0.4rem; color: #5A6A7E; font-weight: 700; }
+  .card p  { font-size: 0.9rem; color: #7A8A9C; margin: 0; line-height: 1.5; }
   .card .icon { font-size: 2rem; }
 
-  .card-orange { border-color: #E05519; }
-  .card-navy   { border-color: #2B4A7A; }
-  .card-orange2{ border-color: #f0874a; }
-  .card-navy2  { border-color: #4a6fa5; }
-  .card-warm   { border-color: #c04010; }
+  .card-orange { border-color: #B3A9D4; }
+  .card-navy   { border-color: #5A6A7E; }
+  .card-orange2{ border-color: #C8B8E8; }
+  .card-navy2  { border-color: #8A9AAC; }
+  .card-warm   { border-color: #9A8ABA; }
 
   /* Sección cómo funciona */
   .step {
@@ -73,7 +73,7 @@ st.markdown("""
     margin-bottom: 1.2rem;
   }
   .step-num {
-    background: #E05519;
+    background: #B3A9D4;
     color: #ffffff;
     border-radius: 50%;
     width: 36px; height: 36px;
@@ -81,19 +81,19 @@ st.markdown("""
     font-weight: 700; font-size: 1rem;
     flex-shrink: 0;
   }
-  .step-text h4 { margin: 0 0 2px; color: #2B4A7A; font-size: 0.95rem; font-weight: 600; }
-  .step-text p  { margin: 0; color: #5a6475; font-size: 0.88rem; }
+  .step-text h4 { margin: 0 0 2px; color: #5A6A7E; font-size: 0.95rem; font-weight: 600; }
+  .step-text p  { margin: 0; color: #7A8A9C; font-size: 0.88rem; }
 
   /* Footer */
   .footer {
     text-align: center;
-    color: #7a8090;
+    color: #A0A0B0;
     font-size: 0.82rem;
     margin-top: 3rem;
     padding-top: 1.5rem;
-    border-top: 2px solid #f0e8e0;
+    border-top: 2px solid #E8E8E8;
   }
-  .footer a { color: #E05519; text-decoration: none; font-weight: 600; }
+  .footer a { color: #B3A9D4; text-decoration: none; font-weight: 600; }
   .footer a:hover { text-decoration: underline; }
 
   /* Ocultar header por defecto de Streamlit */

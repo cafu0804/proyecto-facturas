@@ -198,8 +198,8 @@ with tab_val:
         df_val = st.session_state.df_val
         styled = df_val.style.apply(
             lambda col: [
-                "background-color:#FF4444;color:white" if v == "ERROR"
-                else "background-color:#70AD47;color:white" if v == "OK"
+                "background-color:#D4A0A0;color:#5A5A5A" if v == "ERROR"
+                else "background-color:#A8C8A8;color:#5A5A5A" if v == "OK"
                 else ""
                 for v in col
             ],
